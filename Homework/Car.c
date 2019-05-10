@@ -2,7 +2,7 @@
 
 int yangle = 0;
 GLfloat xangle=0.0;
-GLfloat wheel_x=0.0;
+int wheel_angle=0;
 
 void init()
 {
@@ -89,12 +89,12 @@ void draw_car()
 	//바퀴
 	glPushMatrix();
 	glTranslatef(-1.0, 0.0, 0.0);
-	glRotatef(wheel_x, 1.0, 0.0, 0.0);
+	glRotatef(wheel_angle, 0.0, 1.0, 0.0);
 	glColor3f(0.0, 0.0, 0.0);
 	glutSolidTorus(0.07,0.2,10,25);
 
 	glTranslatef(1.95, 0.0, 0.0);
-	glRotatef(wheel_x, 1.0, 0.0, 0.0);
+	glRotatef(wheel_angle, 0.0, 1.0, 0.0);
 	glutSolidTorus(0.07,0.2,10,25);
 	glPopMatrix();
 }
@@ -117,7 +117,15 @@ void popupMenu(int value)
 {
 	if(value == 1)
 	{
-		// 여기다가 night 코딩
+		GLfloat fogcolour[4]={0.0,0.0,0.0,1.0};
+		glClearColor(0.1,0.1,0.1,0);
+		
+
+		glFogfv(GL_FOG_COLOR,fogcolour);              
+		glFogf(GL_FOG_DENSITY,0.5);                   
+		glFogi(GL_FOG_MODE,GL_EXP);                  
+		glHint(GL_FOG_HINT, GL_FASTEST);             
+		glEnable(GL_FOG);
 		glutPostRedisplay();
 	}
 }
@@ -127,35 +135,26 @@ static void SpecialKeyFunc(int key, int x, int y)
 	switch(key)
 	{
 	case GLUT_KEY_UP:
-		xangle += 0.05;
+		xangle += 0.01;
 		glutPostRedisplay();
 		break;
 
 	case GLUT_KEY_DOWN:
-		xangle -= 0.05;
+		xangle -= 0.01;
 		glutPostRedisplay();
 		break;
 
 	case GLUT_KEY_RIGHT:
+		wheel_angle = (wheel_angle + 5) % 360;
+		glutPostRedisplay();
+		break;
 	case GLUT_KEY_LEFT:
+		wheel_angle = (wheel_angle - 5) % 360;
+		glutPostRedisplay();
+		break;
 	}
 }
 
-/*void keyboardProcess(unsigned char key, int x, int y)
-{
-	switch(key)
-	{
-	case 'y': 
-		yangle=(yangle + 1) % 360;
-		glutPostRedisplay();
-		break;
-	case 'Y':
-		yangle=(yangle - 1 ) % 360;
-		glutPostRedisplay();
-		break;
-	}
-	
-}*/
 
 int main(int argc, char** argv)
 {
@@ -172,7 +171,6 @@ int main(int argc, char** argv)
 
    glutDisplayFunc(display);
    glutReshapeFunc(reshape);
-   glutKeyboardFunc(keyboardProcess);
    glutSpecialFunc(SpecialKeyFunc);
    //glutMouseFunc(mouseProcess);
    
