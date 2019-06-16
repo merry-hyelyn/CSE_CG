@@ -8,27 +8,117 @@
 #include <GL/GLU.h>
 #include <gl/GL.h>
 #include <stdio.h>
+#include <stdlib.h>
+#include "lodepng.h"
+#include <vector>
 
 int year=10;	// 공전 비율을 맞추기 위한 전역 변수
 static int Time = 0;	// 타이머 콜백을 이용하여 자전을 표현하기 위한 전역변수
 static float Day=0, Day1=0, Day2=0, Day3=0, Day4=0, Day5=0, Day6=0, Day7=0; //공전
-GLUquadricObj *sun, *mercury, *venus, *earth, *mars, *jupiter, *saturn, *uranus, *neptune, *moon;
+GLUquadricObj *sun, *mercury, *venus, *earth, *mars, *jupiter, *saturn,*saturn_ring, *uranus, *neptune, *moon;
 GLuint TextureObj[11];	// 텍스쳐를 저장하는 배열
-float angle = 0.0;	// 카메라 줌, 아웃을 하는 전역변수
-float zangle = 0.0, xangle = 0.0;
+float zangle = 0.0, xangle = 0.0 , yangle=0.0;
+
+std::vector<unsigned char> image2;
+
+void loadTexture(GLuint* texture, char* path)
+{
+	std::vector<unsigned char> image;
+	unsigned width, height;
+	unsigned error = lodepng::decode(image, width, height, path);
+	if (!error)
+		printf("Error : %s / %s\n", error, lodepng_error_text(error));
+	size_t u2 = 1; while (u2 < width) u2 *= 2;
+	size_t v2 = 1; while (v2 < height) v2 *= 2;
+	image2 = std::vector<unsigned char>(u2 * v2 * 4);
+	for (size_t y = 0; y < height; y++)
+		for (size_t x = 0; x < width; x++)
+			for (size_t c = 0; c < 4; c++)
+			{
+				image2[4 * u2 * y + 4 * x + c] = image[4 * width * y + 4 * x + c];
+			}
+	glGenTextures(1, texture);
+	glBindTexture(GL_TEXTURE_2D, *texture);
+	glTexImage2D(GL_TEXTURE_2D, 0, 4, u2, v2, 0, GL_RGBA, GL_UNSIGNED_BYTE, &image2[0]);
+	glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+}
 
 void init()
 {
 	glClearColor(0.0, 0.0, 0.0, 1.0);
 	
+	// 조명 설정
+	float lightPosition[4] = { 0.0, 1.0, 1.0, 1.0 };
+	float ambient[4] = { 4.0, 4.0, 4.0, 4.0 };
+	float specular[4] = {1.0, 1.0, 1.0, 1.0 };
+	float diffuse[4] = {1.0, 1.0, 1.0, 1.0};
+
+	glLightfv(GL_LIGHT0, GL_POSITION, lightPosition);
+	glLightfv(GL_LIGHT0, GL_AMBIENT, ambient);
+	glLightfv(GL_LIGHT0, GL_DIFFUSE, diffuse);
+	glLightfv(GL_LIGHT0, GL_SPECULAR, specular);
+
+	// 텍스쳐 읽어오기
+	loadTexture(&TextureObj[0], "sun.png");
+	loadTexture(&TextureObj[1], "mercury.png");
+	loadTexture(&TextureObj[2], "venus.png");
+	loadTexture(&TextureObj[3], "earth.png");
+	loadTexture(&TextureObj[4], "moon.png");
+	loadTexture(&TextureObj[5], "mars.png");
+	loadTexture(&TextureObj[6], "jupiter.png");
+	loadTexture(&TextureObj[7], "saturn.png");
+	loadTexture(&TextureObj[8], "saturn_ring.png");
+	loadTexture(&TextureObj[9], "uranus.png");
+	loadTexture(&TextureObj[10], "neptune.png");
 }
 
-void planet()
+void display()
 {
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+	gluLookAt(8.0, 8.0, 8.0, 0.0, 0.0, 0.0, 2.0, 1.0, 0.0);
+	
+	glEnable(GL_DEPTH_TEST);
+	
+	glMatrixMode(GL_MODELVIEW);
+	glLoadIdentity();	// 다른 이벤트에 영향 받지 않도록 행렬 초기화
+	glEnable(GL_LIGHTING);
+	glEnable(GL_LIGHT0);
+
+	glTranslatef(xangle,yangle,zangle);	// 줌인 줌아웃, 카메라 이동
+	sun = gluNewQuadric();
+    mercury = gluNewQuadric();
+    venus = gluNewQuadric();
+    earth = gluNewQuadric();
+    mars = gluNewQuadric();
+    jupiter = gluNewQuadric();
+    saturn = gluNewQuadric();
+    saturn_ring = gluNewQuadric();
+    uranus = gluNewQuadric();
+    neptune = gluNewQuadric();
+    moon = gluNewQuadric();
+   
+	// 텍스쳐 매핑 사용
+    gluQuadricTexture(sun, GL_TRUE);
+    gluQuadricTexture(mercury, GL_TRUE);
+    gluQuadricTexture(venus, GL_TRUE);
+    gluQuadricTexture(earth, GL_TRUE);
+    gluQuadricTexture(mars, GL_TRUE);
+    gluQuadricTexture(jupiter, GL_TRUE);
+    gluQuadricTexture(saturn, GL_TRUE);
+    gluQuadricTexture(saturn_ring, GL_TRUE);
+    gluQuadricTexture(uranus, GL_TRUE);
+    gluQuadricTexture(neptune, GL_TRUE);
+    gluQuadricTexture(moon, GL_TRUE);
+
+	glEnable(GL_TEXTURE_2D);
+
 	// 태양
 	glRotatef((GLfloat)Time, 0.0, 0.0, 1.0);
 	glColor3f(1.0, 0.0, 0.0);
-	glutWireSphere(1.0, 20, 16);
+	glBindTexture(GL_TEXTURE_2D, TextureObj[0]);
+	// TextureObj에 저장된 텍스쳐를 매핑
+	gluSphere(sun,1.0, 20, 16);
 	
 	
 	// 수성
@@ -37,7 +127,8 @@ void planet()
 	glRotatef(Day, 0.0, 0.0, 1.0);
 	glTranslatef(1.5, 0.0, 0.0);	//태양으로 부터 1.3
 	glRotatef((GLfloat)Time, 0.0, 0.0, 1.0);
-	glutWireSphere(0.1, 10, 8);
+	glBindTexture(GL_TEXTURE_2D, TextureObj[1]);
+	gluSphere(mercury, 0.1, 10, 8);
 	glPopMatrix();
 
 	// 금성
@@ -46,7 +137,8 @@ void planet()
 	glRotatef(Day1, 0.0, 0.0, 1.0);
 	glTranslatef(2.0, 0.0, 0.0);	//태양으로 부터 0.5
 	glRotatef((GLfloat)Time, 0.0, 0.0, 1.0);
-	glutWireSphere(0.25, 10, 8);
+	glBindTexture(GL_TEXTURE_2D, TextureObj[2]);
+	gluSphere(venus, 0.25, 10, 8);
 	glPopMatrix();
 	
 	// 지구
@@ -55,7 +147,8 @@ void planet()
 	glRotatef(Day2, 0.0, 0.0, 1.0);
 	glTranslatef(2.5, 0.0, 0.0);	//태양으로 부터 0.7
 	glRotatef((GLfloat)Time, 0.0, 0.0, 1.0);
-	glutWireSphere(0.25, 10, 8);
+	glBindTexture(GL_TEXTURE_2D, TextureObj[3]);
+	gluSphere(earth, 0.25, 10, 8);
 
 	// 달은 지구 주위를 공전하기 때문에 지구의 좌표계 이용 따라서 지구 glPopMatrix() 쓰지않음
 	// 달
@@ -63,7 +156,8 @@ void planet()
 	glColor3f(1.0, 1.0, 0.0);
 	glRotatef((GLfloat)Time, 0.0, 0.0, 1.0);
 	glTranslatef(0.4, 0.0, 0.0);
-	glutWireSphere(0.06, 10, 8);
+	glBindTexture(GL_TEXTURE_2D, TextureObj[4]);
+	gluSphere(moon, 0.06, 10, 8);
 	glPopMatrix();	// 지구의 좌표계 끝
 	glPopMatrix();	// 지구의 glPopMatrix()
 
@@ -74,7 +168,8 @@ void planet()
 	glRotatef(Day3, 0.0, 0.0, 1.0);
 	glTranslatef(3.0, 0.0, 0.0);
 	glRotatef((GLfloat)Time, 0.0, 0.0, 1.0);
-	glutWireSphere(0.125, 10, 8);
+	glBindTexture(GL_TEXTURE_2D, TextureObj[5]);
+	gluSphere(mars, 0.125, 10, 8);
 	glPopMatrix();
 
 	//목성
@@ -83,7 +178,8 @@ void planet()
 	glRotatef(Day4, 0.0, 0.0, 1.0);
 	glTranslatef(4.3, 0.0, 0.0);
 	glRotatef((GLfloat)Time, 0.0, 0.0, 1.0);
-	glutWireSphere(0.125, 10, 8);
+	glBindTexture(GL_TEXTURE_2D, TextureObj[6]);
+	gluSphere(jupiter, 0.225, 10, 8);
 	glPopMatrix();
 
 	//토성
@@ -92,9 +188,11 @@ void planet()
 	glRotatef(Day5, 0.0, 0.0, 1.0);
 	glTranslatef(5.5, 0.0, 0.0);
 	glRotatef((GLfloat)Time, 0.0, 0.0, 1.0);
-	glutWireSphere(0.125, 10, 8);
+	glBindTexture(GL_TEXTURE_2D, TextureObj[7]);
+	gluSphere(saturn, 0.125, 10, 8);
 	glPushMatrix();
-	glutWireTorus(0.17,0.1,10,8);
+	glBindTexture(GL_TEXTURE_2D, TextureObj[8]);
+	gluDisk(saturn_ring,0.1,0.17,15,8);
 	glPopMatrix();
 	glPopMatrix();
 
@@ -104,7 +202,8 @@ void planet()
 	glRotatef(Day6, 0.0, 0.0, 1.0);
 	glTranslatef(6.3, 0.0, 0.0);
 	glRotatef((GLfloat)Time, 0.0, 0.0, 1.0);
-	glutWireSphere(0.125, 10, 8);
+	glBindTexture(GL_TEXTURE_2D, TextureObj[9]);
+	gluSphere(uranus, 0.125, 10, 8);
 	glPopMatrix();
 	
 	//해왕성
@@ -113,24 +212,10 @@ void planet()
 	glRotatef(Day7, 0.0, 0.0, 1.0);
 	glTranslatef(7.2, 0.0, 0.0);
 	glRotatef((GLfloat)Time, 0.0, 0.0, 1.0);
-	glutWireSphere(0.125, 10, 8);
+	glBindTexture(GL_TEXTURE_2D, TextureObj[10]);
+	gluSphere(neptune, 0.125, 10, 8);
 	glPopMatrix();
-}
 
-void display()
-{
-	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-	gluLookAt(8.0, 8.0, 8.0, 0.0, 0.0, 0.0, 2.0, 1.0, 0.0);
-	
-	glEnable(GL_DEPTH_TEST);
-	glEnable(GL_TEXTURE_2D);
-	glBindTexture(GL_TEXTURE_2D, TextureObj[0]);
-	glMatrixMode(GL_MODELVIEW);
-	glLoadIdentity();	// 다른 이벤트에 영향 받지 않도록 행렬 초기화
-
-	glTranslatef(angle,angle,angle);	// 줌인 줌아웃
-	//glTranslatef(zangle,0.0, 0.0);
-	planet();	// 행성들을 그리는 함수
 	glutSwapBuffers();
 }
 
@@ -181,18 +266,21 @@ void keyboard(unsigned char key, int x, int y)
 	switch(key)
 	{
 	case '+':	// 줌인
-		angle += 0.1;
-		glutPostRedisplay();
+		xangle += 0.1;
+		yangle += 0.1;
+		zangle += 0.1;
 		break;
 
 	case '-':	// 줌 아웃
-		angle -= 0.1;
-		glutPostRedisplay();
+		xangle -= 0.1;
+		yangle -= 0.1;
+		zangle -= 0.1;
 		break;
 
 	default:
 		break;
 	}
+	glutPostRedisplay();
 }
 
 // 공전 속도 조절
@@ -228,17 +316,17 @@ int main(int argc, char** argv)
 	glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGB | GLUT_DEPTH);
 	// 어떠한 버퍼를 쓸 것인지 명시
 
-	glutInitWindowSize(1000, 800);
-	glutInitWindowPosition(0, 0);
+	glutInitWindowSize(1000, 800);		// 윈도우 크기 설정
+	glutInitWindowPosition(0, 0);		// 윈도우 위치 설정
 
 	glutCreateWindow("20174016 김혜린");
 	init();
 
 	glutDisplayFunc(display);
 	glutReshapeFunc(reshape);
-	glutKeyboardFunc(keyboard);
-	glutSpecialFunc(specialkeyboard);
-	glutTimerFunc(40, timerProcess, 1);
+	glutKeyboardFunc(keyboard);			// 키보드 이벤트
+	glutSpecialFunc(specialkeyboard);	// 방향키를 이용하여 카메라의 줌인 줌아웃
+	glutTimerFunc(40, timerProcess, 1);	// 공전과 자전을 위한 타이머 콜백
 	glutMainLoop();
 
 	return 0;
